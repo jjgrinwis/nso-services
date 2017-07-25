@@ -1,0 +1,88 @@
+module l2vpn {
+  namespace "http://com/example/l2vpn";
+  prefix l2vpn;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import tailf-common {
+    prefix tailf;
+  }
+  import tailf-ncs {
+    prefix ncs;
+  }
+  import junos {
+    prefix junos;
+  }
+
+  augment /ncs:services {
+
+    list l2vpn {
+      description "This is an l2vpn service";
+
+      key name;
+      leaf name {
+      tailf:info "Unique l2vpn id";
+        type uint32 {
+          range "512..1024";
+        }
+      }
+
+      uses ncs:service-data;
+      ncs:servicepoint l2vpn-servicepoint;
+
+      tailf:action self-test {
+        tailf:info "Perform self-test of the service";
+        tailf:actionpoint l2vpn-self-test;
+        output {
+          leaf success {
+            type boolean;
+          }
+          leaf message {
+            type string;
+            description
+              "Free format message.";
+          }
+        }
+      }
+
+      leaf policer {
+        tailf:info "Select policers";
+        default 500M;
+        type enumeration {
+           enum 100M;
+           enum 500M;
+           enum 1G;
+        }
+      }
+      
+      list device-if {
+        tailf:info "PE-UNI nterface combination";
+        min-elements 2;
+        max-elements 2;
+        key device;
+
+        leaf device {
+          tailf:info "l2vpn PE";
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
+          }
+        }
+
+        leaf interface {
+          tailf:info "l2vpn UNI interface on PE device";
+          type leafref {
+            // admin@ncs% show | display xpath | display prefixes
+            // path "/ncs:devices/ncs:device[ncs:name='vsrx01']/ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+            // path "deref(../device)/../ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+            path "/ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+          }
+          // An interface we want to configure as l2vpn must have encapsulation vlan-l2vpn and vlan-tagging should be enabled
+          // /ncs:devices/ncs:device[ncs:name='vsrx01']/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name='ge-0/0/2']/junos:flexible-vlan-tagging
+          // /ncs:devices/ncs:device[ncs:name='vsrx01']/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name='ge-0/0/2']/junos:encapsulation flexible-ethernet-services
+          must "/ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:encapsulation = 'flexible-ethernet-services' and /ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:flexible-vlan-tagging" { error-message "Only flexible-ethernet-services interfaces with encapsulation type flexible-vlan-tagging can be selected"; }
+        }
+      }
+    }
+  }
+}

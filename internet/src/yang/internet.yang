@@ -1,0 +1,101 @@
+module internet {
+  namespace "http://com/example/internet";
+  prefix internet;
+
+  import ietf-inet-types { prefix inet;  }
+  import tailf-ncs       { prefix ncs;   }
+  import tailf-common    { prefix tailf; }
+  import junos           { prefix junos; }
+
+  augment /ncs:services {
+    list internet {
+       tailf:info "Internet Service";
+       key internet-id;
+
+       uses ncs:service-data;
+       ncs:servicepoint "internet-servicepoint";
+
+      leaf internet-id {
+         // unique id for internet service
+         tailf:info "Internet Service Instance ID (100 to 200)";
+         type uint32 {
+           range "100..200" {
+              error-message "Internet service ID is out of range. Should be between 100 and 200";
+            }
+         }
+      }
+ 
+      leaf routing-protocol {
+         // select routing protocol
+         tailf:info "Select routing protocol, static or BGP";
+         default bgp;
+         type enumeration {
+            enum bgp;
+            enum static;
+         } 
+      }
+
+      leaf as-number {
+          // BGP AS number Customer
+          when "../routing-protocol='bgp'";
+          mandatory true;
+          tailf:info "BGP AS number of customer. Between 64512 and 64555";
+          type uint32 {
+            range "64512..64555" {
+              error-message "AS number out of range. Should be somewhere between 64512 and 64555";
+            }
+          }
+      }
+
+
+      list link {
+         // we need two e-lines from internet routers to pe-ce interface 
+         tailf:info "PE-CE Attachment Point for Internet VPN";
+         key link-id;
+         min-elements 2;
+         max-elements 2;
+
+         leaf link-id {
+            // using link-id for caculating interface address and vlan-id
+            // using vpn-name as base add attaching link-id
+            tailf:info "BR to CE interface link id";
+            type uint32 {
+               range "0..1" {
+                  error-message "VPN ID is out of range. Should be between 0 and 1";
+               }
+            }
+         }
+
+         leaf device {
+            tailf:info "PE router connected CE device";
+            type leafref {
+               path "/ncs:devices/ncs:device/ncs:name";
+            } must "starts-with(current(),'vmx')" {
+                error-message "only devices starting with vmx can be selected";
+              }
+         }
+
+         leaf pe-ip {
+            // going to caculate this automatically so mandatory
+            tailf:info "PE-CE link IP address";
+            mandatory false;
+            type inet:ipv4-address;
+         }
+
+         leaf ce-ip {
+            // going to caculate this automatically so mandatory
+            tailf:info "CE-PE link IP address";
+            mandatory false;
+            type inet:ipv4-address;
+         }
+
+         leaf interface {
+            tailf:info "Customer facing interface on PE router";
+            type leafref {
+               path "/ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+            }  must "/ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:encapsulation = 'flexible-ethernet-services' and /ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:flexible-vlan-tagging" { error-message "Only flexible-ethernet-services interfaces with encapsulation type flexible-vlan-tagging can be selected"; }
+            }
+         }
+      }
+   }
+}

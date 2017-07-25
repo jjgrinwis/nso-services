@@ -1,0 +1,73 @@
+module l3vpn {
+  namespace "http://com/example/l3vpn";
+  prefix l3vpn;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import tailf-common {
+    prefix tailf;
+  }
+  import tailf-ncs {
+    prefix ncs;
+  }
+  import junos {
+    prefix junos;
+  }
+
+  augment /ncs:services {
+
+    list l3vpn {
+     
+      uses ncs:service-data;
+      ncs:servicepoint l3vpn-servicepoint;
+
+      tailf:info "Telindus VPLS service";
+      key name;
+      leaf name {
+        tailf:info "l3vpn service id (3001..4000)";
+        type uint32 {
+          range "3001..4000" {
+            error-message "l3vpn id should be between 3001 and 4000";
+          }
+        } 
+      }
+
+      leaf policer {
+        tailf:info "Select input policers";
+        default 500M;
+        type enumeration {
+           enum 100M;
+           enum 500M;
+           enum 1G;
+        }
+      }
+
+      list device-if {
+        tailf:info "PE-CE interface combination, max 4";
+        min-elements 2;
+        max-elements 4;
+        key "device";
+
+        leaf device {
+          tailf:info "select l3vpn PE device";
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
+          }
+        }
+
+        list interface {
+          tailf:info "list of interfaces on device";
+          max-elements 2;
+          key interface-name;
+          leaf interface-name {
+             tailf:info "l3vpn CE interface on PE device";
+                type leafref {
+                path "/ncs:devices/ncs:device[ncs:name=current()/../../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+                } must "/ncs:devices/ncs:device[ncs:name=current()/../../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:encapsulation = 'flexible-ethernet-services' and /ncs:devices/ncs:device[ncs:name=current()/../../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:flexible-vlan-tagging" { error-message "Only flexible-ethernet-services interfaces with encapsulation type flexible-vlan-tagging can be selected"; }
+           }
+       }
+      }
+    }
+  }
+}

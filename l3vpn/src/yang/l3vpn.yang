@@ -1,0 +1,74 @@
+module l3vpn {
+  namespace "http://com/example/l3vpn";
+  prefix l3vpn;
+
+  import ietf-inet-types { prefix inet;  }
+  import tailf-ncs       { prefix ncs;   }
+  import tailf-common    { prefix tailf; }
+  import junos           { prefix junos; }
+  
+  augment /ncs:services {
+    list l3vpn {
+       tailf:info "Layer-3 MPLS VPN Service";
+       key vpn-name;
+    
+       uses ncs:service-data;
+       ncs:servicepoint "l3vpn-servicepoint";
+
+      leaf vpn-name {
+         // unique id we're also using as sub-interface id
+         tailf:info "Service Instance ID (4000 to 5000)";
+         type uint32 {
+           range "1..65535" {
+              error-message "VPN ID is out of range. Should be between 4000 and 5000";
+            }
+         }
+      }
+
+      list link {
+         tailf:info "PE-CE Attachment Point";
+         key link-name;
+         unique "device interface";
+         min-elements 1;
+
+         leaf link-name {
+            // using link-id for caculating interface address
+            tailf:info "Link Name";
+            type uint32 {
+               range "1..65535" {
+                  error-message "VPN ID is out of range. Should be between 1 and 65535";
+               }
+            }
+         }
+
+         leaf device {
+            tailf:info "PE Router";
+            type leafref {
+               path "/ncs:devices/ncs:device/ncs:name";
+            }
+         }
+
+         leaf pe-ip {
+            // going to caculate this automatically so mandatory
+            tailf:info "PE-CE Link IP Address";
+            mandatory false;
+            type inet:ipv4-address;
+         }
+
+         leaf ce-ip {
+            // going to caculate this automatically so mandatory
+            tailf:info "CE Neighbor IP Address";
+            mandatory false;
+            type inet:ipv4-address;
+         }
+
+         leaf interface {
+            tailf:info "Customer facing interface";
+            type leafref {
+               path "/ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+            }  must "/ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:encapsulation = 'flexible-ethernet-services' and /ncs:devices/ncs:device[ncs:name=current()/../device]/ncs:config/junos:configuration/junos:interfaces/junos:interface[junos:name=current()]/junos:flexible-vlan-tagging" { error-message "Only flexible-ethernet-services interfaces with encapsulation type flexible-vlan-tagging can be selected"; }
+            }
+         }
+      }
+   }
+}
